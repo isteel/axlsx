@@ -310,11 +310,44 @@ module Axlsx
     # This is still not perfect...
     #  - scaling is not linear as font sizes increst
     #  - different fonts have different mdw and char widths
+    # def autowidth
+    #   return if is_formula? || value == nil
+    #   mdw = 1.78 #This is the widest width of 0..9 in arial@10px)
+    #   font_scale = (font_size/10.0).to_f
+    #   ((value.to_s.count(Worksheet.thin_chars) * mdw + 5) / mdw * 256) / 256.0 * font_scale
+    # end
+
     def autowidth
-      return if is_formula? || value == nil
-      mdw = 1.78 #This is the widest width of 0..9 in arial@10px)
-      font_scale = (font_size/10.0).to_f
-      ((value.to_s.count(Worksheet.thin_chars) * mdw + 5) / mdw * 256) / 256.0 * font_scale
+      return if is_formula? || value.nil?
+      if contains_rich_text?
+        ret = string_width('', font_size) + value.autowidth
+      elsif styles.cellXfs[style].alignment && styles.cellXfs[style].alignment.wrap_text
+        max_width = 0
+        value.to_s.split(/\r?\n/).each do |line|
+          width = string_width(line, font_size)
+          max_width = width if width > max_width
+        end
+        ret = max_width
+      else
+        ret = string_width(value, font_size)
+      end
+      ret
+    end
+
+    def styles
+      row.worksheet.styles
+    end
+
+    def contains_rich_text?
+      type == :richtext
+    end
+
+    MIN_NUMBER_OF_CHARS = 2
+
+    def string_width(string, font_size)
+      font_scale = [ font_size / 10.0, 1.0 ].max
+      #(string.to_s.count(Worksheet.thin_chars) + 3.0) * font_scale
+      (MIN_NUMBER_OF_CHARS + string.to_s.length) * font_scale
     end
 
     # returns the absolute or relative string style reference for
